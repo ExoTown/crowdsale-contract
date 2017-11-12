@@ -5,47 +5,39 @@ pragma solidity ^0.4.11;
  * @dev Math operations with safety checks that throw on error
  */
 contract SafeMath {
-
-    uint constant DAY_IN_SECONDS = 86400;
-    uint constant BASE = 1000000000000000000;
-
-    function mul(uint256 a, uint256 b) constant internal returns (uint256) {
-        uint256 c = a * b;
+    function mul(uint a, uint b) constant internal returns (uint) {
+        uint c = a * b;
         assert(a == 0 || c / a == b);
         return c;
     }
 
-    function div(uint256 a, uint256 b) constant internal returns (uint256) {
+    function div(uint a, uint b) constant internal returns (uint) {
         assert(b != 0); // Solidity automatically throws when dividing by 0
-        uint256 c = a / b;
+        uint c = a / b;
         assert(a == b * c + a % b); // There is no case in which this doesn't hold
         return c;
     }
 
-    function sub(uint256 a, uint256 b) constant internal returns (uint256) {
+    function sub(uint a, uint b) constant internal returns (uint) {
         assert(b <= a);
         return a - b;
     }
 
-    function add(uint256 a, uint256 b) constant internal returns (uint256) {
-        uint256 c = a + b;
+    function add(uint a, uint b) constant internal returns (uint) {
+        uint c = a + b;
         assert(c >= a);
         return c;
     }
 
-    function mulByFraction(uint256 number, uint256 numerator, uint256 denominator) constant internal returns (uint256) {
-        return div(mul(number, numerator), denominator);
-    }
-
     // Volume bonus calculation
-    function volumeBonus(uint256 etherValue) constant internal returns (uint256) {
+    function volumeBonus(uint etherValue) constant internal returns (uint) {
 
-        if(etherValue >= 1000000000000000000000) return 15; // 1000 ETH +15% tokens
         if(etherValue >=  500000000000000000000) return 10; // 500 ETH +10% tokens
         if(etherValue >=  300000000000000000000) return 7;  // 300 ETH +7% tokens
         if(etherValue >=  100000000000000000000) return 5;  // 100 ETH +5% tokens
         if(etherValue >=   50000000000000000000) return 3;  // 50 ETH +3% tokens
         if(etherValue >=   20000000000000000000) return 2;  // 20 ETH +2% tokens
+        if(etherValue >=   10000000000000000000) return 1;  // 10 ETH +1% tokens
 
         return 0;
     }
@@ -58,57 +50,63 @@ contract SafeMath {
 
 contract AbstractToken {
     // This is not an abstract function, because solc won't recognize generated getter functions for public variables as functions
-    function totalSupply() constant returns (uint256) {}
-    function balanceOf(address owner) constant returns (uint256 balance);
-    function transfer(address to, uint256 value) returns (bool success);
-    function transferFrom(address from, address to, uint256 value) returns (bool success);
-    function approve(address spender, uint256 value) returns (bool success);
-    function allowance(address owner, address spender) constant returns (uint256 remaining);
+    function totalSupply() constant returns (uint) {}
+    function balanceOf(address owner) constant returns (uint balance);
+    function transfer(address to, uint value) returns (bool success);
+    function transferFrom(address from, address to, uint value) returns (bool success);
+    function approve(address spender, uint value) returns (bool success);
+    function allowance(address owner, address spender) constant returns (uint remaining);
 
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    event Issuance(address indexed to, uint256 value);
+    event Transfer(address indexed from, address indexed to, uint value);
+    event Approval(address indexed owner, address indexed spender, uint value);
+    event Issuance(address indexed to, uint value);
 }
 
 contract IcoLimits {
-    uint constant privateSaleStart = 1510876800;
-    uint constant privateSaleEnd   = 1512086399;
+    uint constant privateSaleStart = 1511676000; // 11/26/2017 @ 06:00am (UTC)
+    uint constant privateSaleEnd   = 1512172799; // 12/01/2017 @ 11:59pm (UTC)
 
-    uint constant presaleStart     = 1512086400;
-    uint constant presaleEnd       = 1513900799;
+    uint constant presaleStart     = 1512172800; // 12/02/2017 @ 12:00am (UTC)
+    uint constant presaleEnd       = 1513987199; // 12/22/2017 @ 11:59pm (UTC)
 
-    uint constant publicSaleStart  = 1516320000;
-    uint constant publicSaleEnd    = 1521158399;
+    uint constant publicSaleStart  = 1516320000; // 01/19/2018 @ 12:00am (UTC)
+    uint constant publicSaleEnd    = 1521158399; // 03/15/2018 @ 11:59pm (UTC)
 
-    uint constant maintenanceStart = 1521158400;
-    uint constant maintenanceEnd   = 1535759999;
+    uint constant foundersTokensUnlock = 1558310400; // 05/20/2019 @ 12:00am (UTC)
 
     modifier afterPublicSale() {
-        // only ICO contract is allowed to proceed
         require(now > publicSaleEnd);
         _;
     }
+
+    uint constant privateSalePrice = 4000; // SNEK tokens per 1 ETH
+    uint constant preSalePrice     = 3000; // SNEK tokens per 1 ETH
+    uint constant publicSalePrice  = 2000; // SNEK tokens per 1 ETH
+
+    uint constant privateSaleSupplyLimit =  600  * privateSalePrice * 1000000000000000000;
+    uint constant preSaleSupplyLimit     =  1200 * preSalePrice     * 1000000000000000000;
+    uint constant publicSaleSupplyLimit  =  5000 * publicSalePrice  * 1000000000000000000;
 }
 
 contract StandardToken is AbstractToken, IcoLimits {
     /*
      *  Data structures
      */
-    mapping (address => uint256) balances;
+    mapping (address => uint) balances;
     mapping (address => bool) ownerAppended;
-    mapping (address => mapping (address => uint256)) allowed;
+    mapping (address => mapping (address => uint)) allowed;
 
-    uint256 public totalSupply;
+    uint public totalSupply;
 
     address[] public owners;
-    
+
     /*
      *  Read and write storage functions
      */
     /// @dev Transfers sender's tokens to a given address. Returns success.
     /// @param _to Address of token receiver.
     /// @param _value Number of tokens to transfer.
-    function transfer(address _to, uint256 _value) afterPublicSale returns (bool success) {
+    function transfer(address _to, uint _value) afterPublicSale returns (bool success) {
         if (balances[msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
             balances[msg.sender] -= _value;
             balances[_to] += _value;
@@ -128,7 +126,7 @@ contract StandardToken is AbstractToken, IcoLimits {
     /// @param _from Address from where tokens are withdrawn.
     /// @param _to Address to where tokens are sent.
     /// @param _value Number of tokens to transfer.
-    function transferFrom(address _from, address _to, uint256 _value) returns (bool success) {
+    function transferFrom(address _from, address _to, uint _value) afterPublicSale returns (bool success) {
         if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
             balances[_to] += _value;
             balances[_from] -= _value;
@@ -147,14 +145,14 @@ contract StandardToken is AbstractToken, IcoLimits {
 
     /// @dev Returns number of tokens owned by given address.
     /// @param _owner Address of token owner.
-    function balanceOf(address _owner) constant returns (uint256 balance) {
+    function balanceOf(address _owner) constant returns (uint balance) {
         return balances[_owner];
     }
 
     /// @dev Sets approved amount of tokens for spender. Returns success.
     /// @param _spender Address of allowed account.
     /// @param _value Number of approved tokens.
-    function approve(address _spender, uint256 _value) returns (bool success) {
+    function approve(address _spender, uint _value) returns (bool success) {
         allowed[msg.sender][_spender] = _value;
         Approval(msg.sender, _spender, _value);
         return true;
@@ -166,7 +164,7 @@ contract StandardToken is AbstractToken, IcoLimits {
     /// @dev Returns number of allowed tokens for given address.
     /// @param _owner Address of token owner.
     /// @param _spender Address of token spender.
-    function allowance(address _owner, address _spender) constant returns (uint256 remaining) {
+    function allowance(address _owner, address _spender) constant returns (uint remaining) {
         return allowed[_owner][_spender];
     }
 
@@ -174,14 +172,18 @@ contract StandardToken is AbstractToken, IcoLimits {
 
 
 contract ExoTownToken is StandardToken, SafeMath {
+
     /*
      * Token meta data
      */
+
     string public constant name = "ExoTown token";
     string public constant symbol = "SNEK";
     uint public constant decimals = 18;
 
     address public icoContract = 0x0;
+
+
     /*
      * Modifiers
      */
@@ -192,6 +194,7 @@ contract ExoTownToken is StandardToken, SafeMath {
         _;
     }
 
+
     /*
      * Contract functions
      */
@@ -199,7 +202,7 @@ contract ExoTownToken is StandardToken, SafeMath {
     /// @dev Contract is needed in icoContract address
     /// @param _icoContract Address of account which will be mint tokens
     function ExoTownToken(address _icoContract) {
-        assert(_icoContract != 0x0);
+        require(_icoContract != 0x0);
         icoContract = _icoContract;
     }
 
@@ -207,9 +210,7 @@ contract ExoTownToken is StandardToken, SafeMath {
     /// @param _from Address of account, from which will be burned tokens
     /// @param _value Amount of tokens, that will be burned
     function burnTokens(address _from, uint _value) onlyIcoContract {
-        assert(_from != 0x0);
         require(_value > 0);
-        require(totalSupply >= _value);
 
         balances[_from] = sub(balances[_from], _value);
         totalSupply -= _value;
@@ -219,10 +220,7 @@ contract ExoTownToken is StandardToken, SafeMath {
     /// @param _to Address of account to which the tokens will pass
     /// @param _value Amount of tokens
     function emitTokens(address _to, uint _value) onlyIcoContract {
-        assert(_to != 0x0);
-        require(_value > 0);
-        require(totalSupply + _value > totalSupply);
-
+        require(totalSupply + _value >= totalSupply);
         balances[_to] = add(balances[_to], _value);
         totalSupply += _value;
 
@@ -230,6 +228,8 @@ contract ExoTownToken is StandardToken, SafeMath {
             ownerAppended[_to] = true;
             owners.push(_to);
         }
+
+        Transfer(0x0, _to, _value);
 
     }
 
@@ -253,36 +253,25 @@ contract ExoTownIco is SafeMath, IcoLimits {
 
     enum State {
         Pause,
-        Init,
-        Running,
-        Stopped
+        Running
     }
 
     State public currentState = State.Pause;
 
-
-    uint constant privateSalePrice = 4000;
-    uint constant preSalePrice     = 3000;
-    uint constant publicSalePrice  = 2500;
-    uint constant maintenancePrice = 2000;
-
-    
-
-
-
     uint public privateSaleSoldTokens = 0;
     uint public preSaleSoldTokens     = 0;
     uint public publicSaleSoldTokens  = 0;
-    uint public maintenanceSoldTokens = 0;
 
     uint public privateSaleEtherRaised = 0;
     uint public preSaleEtherRaised     = 0;
     uint public publicSaleEtherRaised  = 0;
-    uint public maintenanceEtherRaised = 0;
 
     // Address of manager
     address public icoManager;
     address public founderWallet;
+
+    // Address from which tokens could be burned
+    address public buyBack;
 
     // Purpose
     address public developmentWallet;
@@ -290,6 +279,9 @@ contract ExoTownIco is SafeMath, IcoLimits {
     address public teamWallet;
 
     address public bountyOwner;
+
+    // Mediator wallet is used for tracking user payments and reducing users' fee
+    address public mediatorWallet;
 
     bool public sentTokensToBountyOwner = false;
     bool public sentTokensToFounders = false;
@@ -302,7 +294,7 @@ contract ExoTownIco is SafeMath, IcoLimits {
 
     modifier whenInitialized() {
         // only when contract is initialized
-        require(currentState >= State.Init);
+        require(currentState >= State.Running);
         _;
     }
 
@@ -312,15 +304,8 @@ contract ExoTownIco is SafeMath, IcoLimits {
         _;
     }
 
-    modifier onIcoStopped() {
-        // Checks if ICO was stopped
-        require(currentState == State.Stopped);
-        _;
-    }
-
     modifier onIco() {
-        require(now >= privateSaleStart && now <= maintenanceEnd);
-        require( isPrivateSale() || isPreSale() || isPublicSale() || isMaintenance() );
+        require( isPrivateSale() || isPreSale() || isPublicSale() );
         _;
     }
 
@@ -341,15 +326,6 @@ contract ExoTownIco is SafeMath, IcoLimits {
         return now >= publicSaleStart && now <= publicSaleEnd;
     }
 
-    function isMaintenance() constant internal returns (bool) {
-        return now >= maintenanceStart && now <= maintenanceEnd;
-    }
-
-
-
-
-
-
 
 
 
@@ -360,25 +336,22 @@ contract ExoTownIco is SafeMath, IcoLimits {
         if (isPrivateSale()) return privateSalePrice;
         if (isPreSale()) return preSalePrice;
         if (isPublicSale()) return publicSalePrice;
-        if (isMaintenance()) return maintenancePrice;
 
-        return maintenancePrice;
+        return publicSalePrice;
     }
 
-    function getStageSupplyLimit() constant internal returns (uint) {
-        if (isPrivateSale()) return 4000000 * BASE;
-        if (isPreSale()) return 7500000 * BASE;
-        if (isPublicSale()) return 30000000 * BASE;
-        if (isMaintenance()) return 60000000 * BASE;
+    function getStageSupplyLimit() constant returns (uint) {
+        if (isPrivateSale()) return privateSaleSupplyLimit;
+        if (isPreSale()) return preSaleSupplyLimit;
+        if (isPublicSale()) return publicSaleSupplyLimit;
 
         return 0;
     }
 
-    function getStageSoldTokens() constant internal returns (uint) {
+    function getStageSoldTokens() constant returns (uint) {
         if (isPrivateSale()) return privateSaleSoldTokens;
         if (isPreSale()) return preSaleSoldTokens;
         if (isPublicSale()) return publicSaleSoldTokens;
-        if (isMaintenance()) return maintenanceSoldTokens;
 
         return 0;
     }
@@ -387,23 +360,34 @@ contract ExoTownIco is SafeMath, IcoLimits {
         if (isPrivateSale()) privateSaleSoldTokens = add(privateSaleSoldTokens, _amount);
         if (isPreSale())     preSaleSoldTokens = add(preSaleSoldTokens, _amount);
         if (isPublicSale())  publicSaleSoldTokens = add(publicSaleSoldTokens, _amount);
-        if (isMaintenance()) maintenanceSoldTokens = add(maintenanceSoldTokens, _amount);
-    } 
+    }
 
     function addStageEtherRaised(uint _amount) internal {
         if (isPrivateSale()) privateSaleEtherRaised = add(privateSaleEtherRaised, _amount);
         if (isPreSale())     preSaleEtherRaised = add(preSaleEtherRaised, _amount);
         if (isPublicSale())  publicSaleEtherRaised = add(publicSaleEtherRaised, _amount);
-        if (isMaintenance()) maintenanceEtherRaised = add(maintenanceEtherRaised, _amount);
-    } 
+    }
+
+    function getStageEtherRaised() constant returns (uint) {
+        if (isPrivateSale()) return privateSaleEtherRaised;
+        if (isPreSale())     return preSaleEtherRaised;
+        if (isPublicSale())  return publicSaleEtherRaised;
+
+        return 0;
+    }
 
     function getTokensSold() constant returns (uint) {
-        uint tokensSold = 0;
-        tokensSold = add(tokensSold, privateSaleSoldTokens);
-        tokensSold = add(tokensSold, preSaleSoldTokens);
-        tokensSold = add(tokensSold, publicSaleSoldTokens);
-        tokensSold = add(tokensSold, maintenanceSoldTokens);
-        return tokensSold;
+        return
+            privateSaleSoldTokens +
+            preSaleSoldTokens +
+            publicSaleSoldTokens;
+    }
+
+    function getEtherRaised() constant returns (uint) {
+        return
+            privateSaleEtherRaised +
+            preSaleEtherRaised +
+            publicSaleEtherRaised;
     }
 
 
@@ -423,7 +407,7 @@ contract ExoTownIco is SafeMath, IcoLimits {
     /// @dev Constructor of ICO. Requires address of icoManager,
     /// @param _icoManager Address of ICO manager
     function ExoTownIco(address _icoManager) {
-        assert(_icoManager != 0x0);
+        require(_icoManager != 0x0);
 
         exotownToken = new ExoTownToken(this);
         icoManager = _icoManager;
@@ -434,20 +418,35 @@ contract ExoTownIco is SafeMath, IcoLimits {
     /// @param _dev Address of Development wallet
     /// @param _pr Address of Marketing wallet
     /// @param _team Address of Team wallet
+    /// @param _buyback Address of wallet used for burning tokens
+    /// @param _mediator Address of Mediator wallet
 
-    function init(address _founder, address _dev, address _pr, address _team) onlyManager {
-        assert(currentState < State.Init);
-        assert(_founder != 0x0);
-        assert(_dev != 0x0);
-        assert(_pr != 0x0);
-        assert(_team != 0x0);
+    function init(
+        address _founder,
+        address _dev,
+        address _pr,
+        address _team,
+        address _buyback,
+        address _mediator
+    ) onlyManager {
+        require(currentState == State.Pause);
+        require(_founder != 0x0);
+        require(_dev != 0x0);
+        require(_pr != 0x0);
+        require(_team != 0x0);
+        require(_buyback != 0x0);
+        require(_mediator != 0x0);
 
         founderWallet = _founder;
         developmentWallet = _dev;
         marketingWallet = _pr;
         teamWallet = _team;
-                
-        currentState = State.Init;
+        buyBack = _buyback;
+        mediatorWallet = _mediator;
+
+        currentState = State.Running;
+
+        exotownToken.emitTokens(icoManager, 0);
     }
 
     /// @dev Sets new state
@@ -459,44 +458,56 @@ contract ExoTownIco is SafeMath, IcoLimits {
     /// @dev Sets new manager. Only manager can do it
     /// @param _newIcoManager Address of new ICO manager
     function setNewManager(address _newIcoManager) onlyManager {
-        assert(_newIcoManager != 0x0);
+        require(_newIcoManager != 0x0);
         icoManager = _newIcoManager;
     }
 
     /// @dev Sets bounty owner. Only manager can do it
     /// @param _bountyOwner Address of Bounty owner
     function setBountyCampaign(address _bountyOwner) onlyManager {
-        assert(_bountyOwner != 0x0);
+        require(_bountyOwner != 0x0);
         bountyOwner = _bountyOwner;
+    }
+
+    /// @dev Sets new Mediator wallet. Only manager can do it
+    /// @param _mediator Address of Mediator wallet
+    function setNewMediator(address _mediator) onlyManager {
+        require(_mediator != 0x0);
+        mediatorWallet = _mediator;
     }
 
 
     /// @dev Buy quantity of tokens depending on the amount of sent ethers.
     /// @param _buyer Address of account which will receive tokens
     function buyTokens(address _buyer) private {
-        assert(_buyer != 0x0);
+        require(_buyer != 0x0);
         require(msg.value > 0);
 
         uint tokensToEmit = msg.value * getPrice();
         uint volumeBonusPercent = volumeBonus(msg.value);
 
-        if (volumeBonusPercent > 0){
-            tokensToEmit = add(tokensToEmit, mulByFraction(tokensToEmit, volumeBonusPercent, 100));
+        if (volumeBonusPercent > 0) {
+            tokensToEmit = mul(tokensToEmit, 100 + volumeBonusPercent) / 100;
         }
 
         uint stageSupplyLimit = getStageSupplyLimit();
         uint stageSoldTokens = getStageSoldTokens();
 
         require(add(stageSoldTokens, tokensToEmit) <= stageSupplyLimit);
-        
-        //emit tokens to token holder
+
         exotownToken.emitTokens(_buyer, tokensToEmit);
-        
+
+        // Public statistics
         addStageTokensSold(tokensToEmit);
         addStageEtherRaised(msg.value);
 
         distributeEtherByStage();
-        
+
+    }
+
+    /// @dev Buy tokens to specified wallet
+    function giftToken(address _to) public payable onIco {
+        buyTokens(_to);
     }
 
     /// @dev Fall back function
@@ -505,37 +516,23 @@ contract ExoTownIco is SafeMath, IcoLimits {
     }
 
     function distributeEtherByStage() private {
-        uint _devAmount = 0;
-        uint _prAmount = 0;
-        uint _teamAmount = 0;
-        if (isPrivateSale()) {
-            _devAmount = mulByFraction(this.balance, 45, 100);
-            _prAmount = mulByFraction(this.balance, 50, 100);
-            _teamAmount = mulByFraction(this.balance, 5, 100);
-        }
-        if (isPreSale()) {
-            _devAmount = mulByFraction(this.balance, 60, 100);
-            _prAmount = mulByFraction(this.balance, 30, 100);
-            _teamAmount = mulByFraction(this.balance, 10, 100);
-        }
-        if (isPublicSale()) {
-            _devAmount = mulByFraction(this.balance, 70, 100);
-            _prAmount = mulByFraction(this.balance, 20, 100);
-            _teamAmount = mulByFraction(this.balance, 10, 100);
-        }
-        if (isMaintenance()) {
-            _devAmount = mulByFraction(this.balance, 90, 100);
-            _prAmount = mulByFraction(this.balance, 5, 100);
-            _teamAmount = mulByFraction(this.balance, 5, 100);
-        }
-        uint total = 0;
-        total = add(total, _devAmount);
-        total = add(total, _prAmount);
-        total = add(total, _teamAmount);
-        if (_devAmount > 0 && _prAmount > 0 && _teamAmount > 0 && total <= this.balance) {
-            developmentWallet.transfer(_devAmount);
+        uint _balance = this.balance;
+        uint _balance_div = _balance / 100;
+
+        uint _devAmount = _balance_div * 65;
+        uint _prAmount = _balance_div * 25;
+
+        uint total = _devAmount + _prAmount;
+        if (total > 0) {
+            // Top up Mediator wallet with 1% of Development amount = 0.65% of contribution amount.
+            // It will cover tracking transaction fee (if any).
+
+            uint _mediatorAmount = _devAmount / 100;
+            mediatorWallet.transfer(_mediatorAmount);
+
+            developmentWallet.transfer(_devAmount - _mediatorAmount);
             marketingWallet.transfer(_prAmount);
-            teamWallet.transfer(_teamAmount);
+            teamWallet.transfer(_balance - _devAmount - _prAmount);
         }
     }
 
@@ -543,39 +540,38 @@ contract ExoTownIco is SafeMath, IcoLimits {
     /// @dev Partial withdraw. Only manager can do it
     function withdrawEther(uint _value) onlyManager {
         require(_value > 0);
-        assert(_value <= this.balance);
+        require(_value * 1000000000000000 <= this.balance);
         // send 1234 to get 1.234
         icoManager.transfer(_value * 1000000000000000); // 10^15
     }
 
-    ///@dev Send tokens to bountyOwner depending on crowdsale results. Can be send only after ICO.
-    function sendTokensToBountyOwner() onlyManager whenInitialized hasBountyCampaign {
-        require(now > publicSaleEnd);
+    ///@dev Send tokens to bountyOwner depending on crowdsale results. Can be sent only after public sale.
+    function sendTokensToBountyOwner() onlyManager whenInitialized hasBountyCampaign afterPublicSale {
         require(!sentTokensToBountyOwner);
 
-        uint tokensSold = getTokensSold();
-
         //Calculate bounty tokens depending on total tokens sold
-        uint bountyTokens = mulByFraction(tokensSold, 25, 1000); // 2.5%
+        uint bountyTokens = getTokensSold() / 40; // 2.5%
 
         exotownToken.emitTokens(bountyOwner, bountyTokens);
 
         sentTokensToBountyOwner = true;
     }
 
-    /// @dev Send tokens to founders.
-    function sendTokensToFounders() onlyManager whenInitialized {
-        require(now > maintenanceEnd);
+    /// @dev Send tokens to founders. Can be sent only after May 20th, 2019.
+    function sendTokensToFounders() onlyManager whenInitialized afterPublicSale {
         require(!sentTokensToFounders);
+        require(now >= foundersTokensUnlock);
 
         //Calculate founder reward depending on total tokens sold
-        uint tokensSold = getTokensSold();
+        uint founderReward = getTokensSold() / 10; // 10%
 
-        uint founderReward = mulByFraction(tokensSold, 10, 100); // 10%
-
-        //send every founder 25% of total founder reward
         exotownToken.emitTokens(founderWallet, founderReward);
 
         sentTokensToFounders = true;
+    }
+
+    // Anyone could burn tokens by sending it to buyBack address and calling this function.
+    function burnTokens(uint _amount) afterPublicSale {
+        exotownToken.burnTokens(buyBack, _amount);
     }
 }
